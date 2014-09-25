@@ -79,6 +79,9 @@ our $lcov_version	= 'LCOV version '.`$tool_dir/get_version.sh --version`;
 our $lcov_url		= "http://ltp.sourceforge.net/coverage/lcov.php";
 our $tool_name		= basename($0);
 
+# Specify coverage rate default precision
+our $default_precision = 1;
+
 # Specify coverage rate limits (in %) for classifying file entries
 # HI:   $hi_limit <= rate <= 100          graph color: green
 # MED: $med_limit <= rate <  $hi_limit    graph color: orange
@@ -355,6 +358,7 @@ if ($config || %opt_rc)
 		"genhtml_html_epilog"		=> \$html_epilog_file,
 		"genhtml_html_extension"	=> \$html_ext,
 		"genhtml_html_gzip"		=> \$html_gzip,
+		"genhtml_precision"	    => \$default_precision,
 		"genhtml_function_hi_limit"	=> \$fn_hi_limit,
 		"genhtml_function_med_limit"	=> \$fn_med_limit,
 		"genhtml_function_coverage"	=> \$func_coverage,
@@ -410,6 +414,7 @@ if (!GetOptions("output-directory|o=s"	=> \$output_directory,
 		"ignore-errors=s"	=> \@opt_ignore_errors,
 		"config-file=s"		=> \$opt_config_file,
 		"rc=s%"			=> \%opt_rc,
+        "precision=i"   => \$default_precision,
 		))
 {
 	print(STDERR "Use $tool_name --help to get usage information\n");
@@ -533,6 +538,14 @@ if ($demangle_cpp)
 	}
 }
 
+# Make sure precision is within valid range
+if ($default_precision < 1 || $default_precision > 4)
+{
+	warn("WARNING: invalid precision specified (out of range [1,4]). set to default precision: 1\n");
+    $default_precision = 1;
+}
+
+
 # Make sure output_directory exists, create it if necessary
 if ($output_directory)
 {
@@ -600,6 +613,7 @@ HTML output:
       --html-gzip                   Use gzip to compress HTML
       --(no-)sort                   Enable (disable) sorted coverage views
       --demangle-cpp                Demangle C++ function names
+      --precision NUM               Set precision of coverage rate
 
 For more information see: $lcov_url
 END_OF_USAGE
@@ -5959,21 +5973,21 @@ sub parse_ignore_errors(@)
 
 sub rate($$;$$$)
 {
-        my ($hit, $found, $suffix, $precision, $width) = @_;
-        my $rate; 
+    my ($hit, $found, $suffix, $precision, $width) = @_;
+    my $rate; 
 
 	# Assign defaults if necessary
-        $precision	= 1	if (!defined($precision));
-	$suffix		= ""	if (!defined($suffix));
+    $precision	= $default_precision if (!defined($precision));
+	$suffix		= "" if (!defined($suffix));
 	$width		= 0	if (!defined($width));
         
-        return sprintf("%*s", $width, "-") if (!defined($found) || $found == 0);
-        $rate = sprintf("%.*f", $precision, $hit * 100 / $found);
+    return sprintf("%*s", $width, "-") if (!defined($found) || $found == 0);
+    $rate = sprintf("%.*f", $precision, $hit * 100 / $found);
 
 	# Adjust rates if necessary
-        if ($rate == 0 && $hit > 0) {
+    if ($rate == 0 && $hit > 0) {
 		$rate = sprintf("%.*f", $precision, 1 / 10 ** $precision);
-        } elsif ($rate == 100 && $hit != $found) {
+    } elsif ($rate == 100 && $hit != $found) {
 		$rate = sprintf("%.*f", $precision, 100 - 1 / 10 ** $precision);
 	}
 
